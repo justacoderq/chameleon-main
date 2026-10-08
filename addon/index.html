@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chameleon Layout Studio</title><link rel="stylesheet" href="styles.css"></head>
+<body><main>
+<header><p class="eyebrow">CHAMELEON / LAYOUT STUDIO</p><h1>One design.<br>Another canvas.</h1>
+<p>Keep your content. Give it room to work.</p></header>
+<section aria-labelledby="source-heading"><h2 id="source-heading">1. Choose a design</h2>
+<label for="sample">Try a supplied design</label><select id="sample"><option value="">Choose a sample…</option></select>
+<label for="file" class="upload">Or open a Chameleon design JSON<input id="file" type="file" accept=".json,application/json"></label>
+<p id="source-info" class="muted">Text, images, and shapes stay connected.</p></section>
+<section aria-labelledby="target-heading"><h2 id="target-heading">2. Choose a canvas</h2>
+<label for="format">Format</label><select id="format"><option value="1080,1080">Square · 1080 × 1080</option><option value="1080,1920">Story · 1080 × 1920</option><option value="1280,720">Landscape · 1280 × 720</option><option value="1600,400">Wide banner · 1600 × 400</option><option value="728,90">Compact banner · 728 × 90</option></select>
+<div class="dimensions"><label>Width<input id="width" type="number" min="1" max="4096" value="1080"></label><span>×</span><label>Height<input id="height" type="number" min="1" max="4096" value="1080"></label></div>
+<button id="resize" disabled>Adapt design</button></section>
+<p id="status" role="status" aria-live="polite">Connecting to your local engine…</p>
+<section id="result" hidden><div class="tabs"><button id="show-result" class="secondary">Adapted</button><button id="show-source" class="secondary">Original</button></div>
+<img id="preview" alt="Design preview"><p id="quality"></p>
+<div class="actions"><button id="download" class="secondary">Save design JSON</button><button id="download-png" class="secondary">Save PNG</button><button id="insert" hidden>Add preview to Express</button></div>
+<details><summary>Run details</summary><pre id="details"></pre></details></section>
+<footer>Local layout engine · original assets preserved</footer>
+</main><script type="module" src="app.js"></script></body></html>

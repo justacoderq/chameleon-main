@@ -1,99 +1,94 @@
-# CHAMELEON — starter repo
+# Chameleon baseline — Prachi
 
-This is the scaffolding for your engine. It handles input loading, output
-writing, rendering, and Docker packaging — so the only file you need to
-edit is **`engine/resize.py`**.
+Branch: baseline-solution-prachi. An offline design reflow engine, local Hugging Face
+model, test harness, comparison gallery, and Express preview panel.
 
-```
-input:  a task JSON (source design + target canvas)
-              |
-              v
-        engine/resize.py   <-- YOU IMPLEMENT THIS
-              |
-              v
-output: <task>_output.json  (schema-valid resized design)
-        <task>_output.png   (rendered preview)
-```
+The CPU model is **google/flan-t5-small** at a pinned revision. It ranks text roles;
+deterministic search fits groups, images, and measured text into the target canvas.
+Original text, font families, IDs, assets, colors, layers, and groups are preserved.
+There is no image generation or runtime model download.
 
-Both the JSON and the PNG are what get evaluated — see `RULES.md`.
+## Current verification
 
-## Repo layout
+The real model runs on the inspected Ryzen 5 5625U Windows laptop with approximately
+14 GiB usable RAM. The baseline has passed offline model integration and contract
+tests. See docs/RESULTS.md for measured results and limitations.
 
-```
-engine/
-  resize.py        <- implement your approach here
-  main.py           <- orchestrator (input -> resize() -> output). Don't need to edit this.
-renderer/           <- the real renderer (transformer-convertor + cr-renderer), already vendored
-brand_kit/
-  assets/           <- image files referenced by asset_id in the sample designs
-  fonts/            <- font files matching the schema's font_family values
-input/               <- drop task JSON files here for local testing (3 samples included)
-output/              <- results land here
-chameleon_design_schema_v0.9.json   <- full field-by-field spec for the design format
-Dockerfile
-RULES.md
-```
+**Not submission-verified yet:** the official cr-renderer dependency could not be
+installed through this session's blocked network; Docker is not installed, and no
+browser was connected for live Express testing. Current PNGs use an explicitly
+labeled Pillow development renderer. Extreme banners still contain unreadably small
+text. Model approval must be checked against the organizer's final list.
 
-## Quick start (no Docker needed for iterating on `resize()`)
+## Run on this workspace now (PowerShell)
 
-```bash
-pip install -r requirements.txt
-python -m engine.main
-```
+From the inner chameleon-main directory:
 
-This processes every `*.json` file in `input/` (the 3 sample designs are
-already there — one per difficulty level) and writes an `_output.json` and
-`_output.png` for each into `output/`.
+    .\.venv\Scripts\python.exe -m engine.main --model required --renderer pillow --output output/local-run
+    .\.venv\Scripts\python.exe -m engine.service --model required --renderer pillow
 
-The included baseline is a **uniform stretch** — deliberately the wrong
-approach (see the main brief: "a naive program stretches the picture; a
-good one moves the furniture"). It's there so the pipeline runs on day
-one. Run it once, look at `output/*_output.png`, and you'll see exactly
-why it's not good enough — that's the point. Replace the body of
-`resize()` in `engine/resize.py`, not just its constants.
+Open http://localhost:5241 for the local panel. It accepts the supplied sample tasks
+or a source design JSON, then previews/downloads the resized design. Assets referenced
+by imported JSON must already be in brand_kit/assets; a flat image is not a structured
+design input. Missing assets are preserved as references and shown as placeholders.
 
-## What the self-check does (and doesn't do)
+The local public FLAN weights have been copied into models/flan-t5-small. They are
+not committed to Git; models/manifest.json records their revision and SHA256 hashes.
 
-`main.py` runs a quick structural check after every task — same element
-`id`s as the source, required fields present, nothing off-canvas. **This
-is not the official scorer.** It exists to catch obvious mistakes before
-you waste a submission on them. See `RULES.md` for what's actually
-checked and graded.
+## Set up a clean machine
 
-A self-check warning does not fail the run — your JSON and PNG are still
-written either way. Read the warning; decide whether it's a real problem
-or, like the Level 2 sample's intentionally corner-bleeding decorative
-circle, an expected one.
+Python 3.11 is recommended for dependency wheel compatibility. A GPU is unnecessary.
 
-## The renderer
+    python -m venv .venv
+    .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt -r requirements-model.txt
+    .\.venv\Scripts\python.exe -m scripts.prepare_flan
+    .\.venv\Scripts\python.exe -m engine.main --model required
 
-`main.py` calls `renderer/converter/convert.py`'s `render_design_to_png()`
-(a vendored copy of `transformer-convertor`, wrapping `cr-renderer`) to
-produce each task's PNG — already wired in, no setup needed. It reads
-fonts/assets from `brand_kit/` and writes a real rendered preview, not a
-placeholder. If you ever see plain labeled boxes instead of real text and
-images in `output/*.png`, that means the import in `main.py` failed (e.g.
-`cr-renderer` didn't install — check `requirements.txt` installed cleanly)
-and it silently fell back to the box-and-label placeholder; don't judge
-your layout quality by that fallback.
+Setup needs internet; inference does not. On Linux/macOS use .venv/bin/python.
+The default renderer is official and fails explicitly if unavailable. Never present
+the Pillow gallery as official renderer/scorer evidence.
 
-## Docker (how you'll actually be run)
+## Test and inspect
 
-```bash
-docker build --platform linux/amd64 -t my-chameleon-engine .
-docker run --rm --network none \
-  -v $(pwd)/input:/app/input \
-  -v $(pwd)/output:/app/output \
-  my-chameleon-engine
-```
+    .\.venv\Scripts\python.exe -m pytest -q
+    $env:CHAMELEON_TEST_LIVE_MODEL = "1"
+    .\.venv\Scripts\python.exe -m pytest -q
+    .\.venv\Scripts\python.exe -m evaluation.run --split samples --model required --renderer pillow --output output/model-samples
+    .\.venv\Scripts\python.exe -m evaluation.run --split holdout --count 12 --model required --renderer none --output output/holdout-model
+    .\.venv\Scripts\python.exe -m scripts.doctor
 
-`--network none` matches how stage-one scoring runs: everything your
-engine needs must be installed at **build** time (add it to
-`requirements.txt`), not fetched at run time. If you're using a locally
-hosted model, bake its weights into the image during the build step.
+Open output/model-samples/index.html for original/stretch/result comparisons.
+Reports separate hard contract failures, overflow, small text, potential collisions,
+model status, and latency. They are local quality proxies, **not Adobe scores**.
+Run with --model off for an ablation. The synthetic holdout uses separate seeds but
+the same generator; add genuinely new designs before trusting generalization.
 
-## See also
+## Offline container validation (requires Docker)
 
-- `chameleon_design_schema_v0.9.json` — full input/output field spec
-- `RULES.md` — what's checked, what's graded, and what disqualifies a submission
-- FAQ — for anything not covered above
+    docker build --platform linux/amd64 -t chameleon-prachi .
+    docker run --rm --network none --mount "type=bind,source=$((Get-Location).Path)/input,target=/app/input,readonly" --mount "type=bind,source=$((Get-Location).Path)/output,target=/app/output" chameleon-prachi
+
+Build downloads pinned public model weights and required packages. Runtime requires
+the model and official renderer; missing dependencies produce errors. Confirm the
+final organizer architecture/hardware requirements before freezing a submission.
+The upstream cr-renderer Git dependency is not commit-pinned yet; capture a verified
+revision and dependency lock after the first successful official build.
+
+## Files
+
+- engine/resize.py: public resize contract, grouping, candidate generation and scoring.
+- engine/local_model.py: local FLAN label likelihoods; optional GGUF adapter.
+- engine/typography.py, geometry.py, appearance.py: fitting, bounds, contrast proxy.
+- engine/main.py: batch JSON/PNG outputs and honest failure diagnostics.
+- evaluation/: independent contract checks, synthetic cases and review galleries.
+- tests/: invariants, mutations, service checks, actual offline-model integration.
+- addon/ and engine/service.py: local/Express preview panel and engine endpoint.
+- docs/ARCHITECTURE.md: approach, research sources and tradeoffs.
+- docs/REQUIREMENTS.md: brief-to-deliverable mapping and unresolved rules.
+- docs/EXPRESS.md: HTTPS and Adobe host testing steps; current insertion limits.
+- docs/PITCH.md: short pitch and demo narration.
+- WORK_LOG.md: chronological actions, failures, decisions and checks.
+
+Generate the silent 18-second engine walkthrough with python -m scripts.make_demo.
+It writes output/demo/chameleon-engine-demo.avi from actual model sample previews.
+This is not a live Express recording; record that separately after host verification.

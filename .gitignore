@@ -20,3 +20,12 @@ venv/
 # Generated run artifacts
 output/*
 !output/.gitkeep
+
+# Downloaded public weights and local build caches
+models/*
+!models/README.md
+!models/manifest.json
+.cache/
+tmp/
+addon/node_modules/
+addon/dist/
