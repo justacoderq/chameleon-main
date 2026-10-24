@@ -11,6 +11,8 @@ from engine.geometry import area, background, bounds, contain, decorative, inter
 from engine.local_model import advise
 from engine.typography import fit_font, fits, metric_backend
 from engine.appearance import background_map, text_penalty
+from engine.reflow import reflow
+from evaluation.audit import audit
 
 
 def _validate(source, target):
@@ -189,9 +191,44 @@ def _score(source, target, out, units, desired_scale, backdrop):
 
 
 def resize_with_diagnostics(source: dict[str, Any], target_canvas: dict[str, Any]):
+    """Run both layout engines and keep the better result.
+
+    - reflow (engine/reflow.py): structure-aware layouts (preserve / stack /
+      split / banner row) with renderer-exact text fitting; primary.
+    - partition search (below): grid / partition / editorial candidates;
+      kept as a competitor and as a safety net.
+    The output-contract audit referees: reflow wins unless it breaks the
+    contract or overflows more text than the partition search.
+    """
     _validate(source, target_canvas)
     target = {k: target_canvas[k] for k in ("width", "height")}
     hints, model = advise(source["elements"])
+    search_out, diagnostics = _partition_search(source, target, hints, model)
+    roles = {source["elements"][i]["id"]: r for i, r in hints.items()}
+    try:
+        reflow_out, reflow_info = reflow(source, target, roles)
+    except Exception as exc:  # never let the primary engine take the run down
+        reflow_out, reflow_info = None, {"error": f"{type(exc).__name__}: {exc}"}
+    chosen, engine = search_out, "partition-search"
+    if reflow_out is not None:
+        mine, theirs = audit(source, reflow_out, target), audit(source, search_out, target)
+        reflow_info["audit"] = {k: mine[k] for k in ("valid", "text_overflows", "small_texts", "collisions")}
+        detail = reflow_info.get("detail", {})
+        clean = detail.get("overlap", 1) < 0.05 and not detail.get("oob")
+
+        def cost(a):
+            return 3 * a["text_overflows"] + a["small_texts"] + 0.5 * a["collisions"]
+
+        if mine["valid"] and (not theirs["valid"] or (
+                mine["text_overflows"] <= theirs["text_overflows"] and (clean or cost(mine) <= cost(theirs)))):
+            chosen, engine = reflow_out, "reflow"
+    diagnostics.update(engine=engine, reflow=reflow_info)
+    diagnostics["warnings"] = (["Some copy cannot remain comfortably readable at this target size."]
+                               if any(e["type"] == "text" and e["font_size"] < 10 for e in chosen["elements"]) else [])
+    return chosen, diagnostics
+
+
+def _partition_search(source, target, hints, model):
     units, backgrounds, decorations = _units(source, hints)
     tw, th = target["width"], target["height"]
     desired_scale = min(2.0, math.sqrt(tw * th / (source["canvas"]["width"] * source["canvas"]["height"])))
@@ -257,6 +294,7 @@ def resize_with_diagnostics(source: dict[str, Any], target_canvas: dict[str, Any
                     add(f"editorial-{fraction}-{band}", _partition(images,image_rect,.5) +
                         _grid(copy_units,copy_rect,1,.65) + _grid(groups,group_rect,len(groups),.4))
     candidates.sort(key=lambda c: c[0], reverse=True)
+    # (partition search: best of its own candidates)
     best_score, name, elements = candidates[0]
     return {"canvas": target, "elements": elements}, {
         "selected": name, "score": best_score, "candidate_count": len(candidates), "model": model,
