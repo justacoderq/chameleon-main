@@ -160,3 +160,47 @@ def test_contrast_proxy_penalizes_white_on_white():
     el = next(e for e in synthetic(0)["elements"] if e["type"] == "text")
     target = {"width":1000,"height":1000}
     assert text_penalty(el,Image.new("RGB",(96,96),"white"),target,[]) > text_penalty(el,Image.new("RGB",(96,96),"black"),target,[])
+
+
+def test_invalid_canvas_dimensions_are_rejected():
+    source = synthetic(0)
+    for bad in [{"width": 0, "height": 100}, {"width": -10, "height": 100}, {"width": True, "height": 100},
+                {"width": 100, "height": 0}, {"width": 100, "height": 0.5}]:
+        with pytest.raises(ValueError):
+            resize(source, bad)
+
+
+@pytest.mark.parametrize("size", [(90, 2000), (2000, 90), (72, 90), (1280, 240), (240, 1280)])
+def test_extreme_aspect_ratio_targets_remain_contract_valid(size):
+    source = synthetic(0)
+    target = {"width": size[0], "height": size[1]}
+    output = resize(source, target)
+    assert audit(source, output, target)["hard_errors"] == []
+
+
+def test_audit_rejects_mutated_immutable_properties():
+    source = synthetic(0)
+    target = {"width": 1000, "height": 1000}
+    out = resize(source, target)
+    out["elements"][0]["fill"] = "#ff0000"
+    assert any("immutable properties changed" in err for err in audit(source, out, target)["hard_errors"])
+
+
+def test_invalid_model_mode_is_rejected(monkeypatch):
+    import engine.local_model as module
+    monkeypatch.setenv("CHAMELEON_MODEL_MODE", "unsupported")
+    with pytest.raises(ValueError, match="CHAMELEON_MODEL_MODE"):
+        module.advise(synthetic(0)["elements"])
+
+
+def test_grouped_layout_stays_within_canvas_on_small_landscape_target():
+    task = json.loads((ROOT / "input/chameleon_sample_level3_advanced.json").read_text())
+    source, target = task["source"], {"width": 540, "height": 900}
+    output = resize(source, target)
+    result = audit(source, output, target)
+    assert result["hard_errors"] == []
+    for e in output["elements"]:
+        assert math.isfinite(e["x"]) and math.isfinite(e["y"]) and math.isfinite(e["width"]) and math.isfinite(e["height"])
+        assert e["x"] >= -0.01 and e["y"] >= -0.01
+        assert e["x"] + e["width"] <= target["width"] + 0.01
+        assert e["y"] + e["height"] <= target["height"] + 0.01
