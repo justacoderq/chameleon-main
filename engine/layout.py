@@ -136,6 +136,8 @@ def size_text(b: Block, s: float, max_w: float, ctx: Ctx, widen: Optional[float]
     lay = M.fit(el, wl, INF, target, 1, int(ml) if ml else None)
     if lay is None:
         lay = M.layout(el, 1, wl)
+    if float(el.get("letter_spacing") or 0) > 0:
+        return _size_spaced_text(b, el, lay, wl, target, ml, f0, minf, M)
     f = lay.font_size
     tight = min(wl, lay.max_line_width + 2)
     if tight < wl:
@@ -145,6 +147,25 @@ def size_text(b: Block, s: float, max_w: float, ctx: Ctx, widen: Optional[float]
     ok = (f >= minf - 1e-6) and not lay.overflow
     geo = {el["id"]: {"x": 0.0, "y": 0.0, "width": tight, "height": lay.height, "font_size": f}}
     return Sized(b, tight, lay.height, geo, [(0, 0, tight, lay.height)], f / f0, ok, [(f, f0)])
+
+
+def _size_spaced_text(b: Block, el: dict, lay, wl: float, target: int, ml, f0: float, minf: float, M) -> Sized:
+    """Letter-spaced text: the renderer wraps at the box width on glyph widths,
+    then draws each line wider by the spacing. Narrow the box (the wrap width)
+    until the drawn lines fit the available width; the footprint is what's drawn."""
+    ww = wl
+    for _ in range(5):
+        if lay.max_line_width <= wl + 0.5:
+            break
+        ww = max(1.0, ww * wl / lay.max_line_width - 1.0)
+        lay = M.fit(el, ww, INF, target, 1, int(ml) if ml else None) or M.layout(el, 1, ww)
+    f = lay.font_size
+    vis = max(ww, lay.max_line_width)
+    align = el.get("text_align", "left")
+    ox = (vis - ww) / 2 if align == "center" else (vis - ww if align == "right" else 0.0)
+    ok = (f >= minf - 1e-6) and not lay.overflow and lay.max_line_width <= wl + 0.5
+    geo = {el["id"]: {"x": ox, "y": 0.0, "width": ww, "height": lay.height, "font_size": f}}
+    return Sized(b, vis, lay.height, geo, [(0, 0, vis, lay.height)], f / f0, ok, [(f, f0)])
 
 
 def size_image(b: Block, s: float, max_w: float, max_h: float, k: float = 1.0,

@@ -202,17 +202,20 @@ class TextMeasurer:
         widths = self.backend.char_widths(family, bold, italic, size, text)
         wrapped = self._wrap(text, widths, width)
         lines = wrapped.split("\n")
-        max_w = 0.0
+        max_w = glyph_w = 0.0
         idx = 0
         for line in lines:
             n = len(line)
-            lw = sum(widths[idx:idx + n]) + letter_spacing * max(0, n - 1)
-            max_w = max(max_w, lw)
+            gw = sum(widths[idx:idx + n])
+            glyph_w = max(glyph_w, gw)
+            max_w = max(max_w, gw + letter_spacing * max(0, n - 1))   # as drawn
             idx += n + 1
         asc, desc = self.backend.metrics(family, bold, italic)
         n_lines = len(lines)
         height = (n_lines - 1) * size * line_height + (asc + desc) * size
-        overflow = max_w > width + 0.5
+        # The renderer wraps on glyph widths alone and adds letter spacing when it
+        # draws, so a line only overflows (a word that can't wrap) on glyph width.
+        overflow = glyph_w > width + 0.5
         return TextLayout(size, n_lines, max_w, height, overflow, width)
 
     def fit(self, el: dict, width: float, max_height: float, f_max: int, f_min: int = 1,

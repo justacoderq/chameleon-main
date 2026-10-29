@@ -148,6 +148,8 @@ def _reconcile_text(e: dict, W: int, H: int, measure) -> None:
     """Grow the box (or, failing that, shrink the font) until the audit's
     measurement of the text fits inside it."""
     rigid = bool(e.get("group_id"))  # grouped labels keep their box; only the font gives
+    if float(e.get("letter_spacing") or 0) > 0 and not rigid:
+        return _reconcile_spaced(e, H, measure)
     for _ in range(60):
         m = measure(e)
         over_w = m["width"] > e["width"] + 0.05
@@ -173,6 +175,15 @@ def _reconcile_text(e: dict, W: int, H: int, measure) -> None:
         if e["font_size"] <= 1:
             return
         e["font_size"] -= 1
+
+
+def _reconcile_spaced(e: dict, H: int, measure) -> None:
+    """Letter-spaced text: the box width is the renderer's wrap width, chosen by
+    the layout, so leave it alone (widening would re-wrap the lines); only make
+    sure the box is tall enough for the text."""
+    m = measure(e)
+    if m["height"] > e["height"] + 0.05:
+        e["height"] = min(float(H), m["height"] + 0.5)
 
 
 def _widen_to_unwrap(e: dict, W: int, measure) -> bool:
