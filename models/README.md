@@ -1,23 +1,29 @@
 # Local model
 
-Verified baseline: google/flan-t5-small (77M parameters, Apache-2.0), revision
-0fc9ddf78a1e988dac52e2dac162b0ede4fd74ab. Model eligibility is UNCONFIRMED until the
-organizer publishes its approved list and size cap.
+The default model is `google/flan-t5-small`, pinned to revision
+`0fc9ddf78a1e988dac52e2dac162b0ede4fd74ab` (77M parameters, Apache-2.0).
+`manifest.json` records the expected file sizes and SHA-256 hashes.
 
-Run python -m scripts.prepare_flan while online, or pass --source with a complete
-local snapshot directory. This copies only safetensors/tokenizer/config/card files
-into models/flan-t5-small and records revision, SHA256 hashes and sizes in manifest.json.
-The weights are ignored by Git. A local copy is already prepared in this workspace.
+Model weights are not committed to Git. For a local run, prepare a complete
+snapshot while online:
 
-Set CHAMELEON_MODEL_MODE=required to fail when inference is unavailable. Both the model
-and tokenizer load with local_files_only=True. No runtime downloads occur. The Docker
-build downloads weights at build time and requires the local model at runtime.
+```sh
+python -m scripts.prepare_flan
+```
 
-The model ranks five text-role labels. It cannot invent geometry, rewrite text, add
-elements or alter assets. On the first held-out synthetic comparison, its benefit was
-small: 47 text elements below 10px versus 48 with the model disabled.
+The Docker build prepares the model at build time. At runtime the tokenizer and
+weights load locally; the engine does not download them. `--model required`
+fails if inference is unavailable, `--model auto` reports unavailability, and
+`--model off` disables inference for an explicit geometric ablation.
 
-Optional unverified alternative: install requirements-gguf.txt, run
-python -m scripts.prepare_model, and set CHAMELEON_MODEL_PATH to the downloaded .gguf.
-The adapter supports Qwen2.5-0.5B-Instruct GGUF through llama-cpp-python. Its weights and
-runtime could not be downloaded here, so do not claim it has been tested.
+The model ranks fixed text-role labels only. It does not generate geometry,
+rewrite copy, or modify assets. Existing paired synthetic experiments show no
+measured reduction in small-text counts from enabling FLAN; the model is a
+bounded hint, not a demonstrated quality improvement. See
+[`docs/RESULTS.md`](../docs/RESULTS.md).
+
+The repository also contains an optional GGUF adapter, but it is not part of the
+default Docker image and is not included in the verified model results.
+The brief says model constraints were being finalized; later info-session notes
+reported that downloadable open weights were acceptable and small, swappable
+models were encouraged. Check for any newer organizer guidance.

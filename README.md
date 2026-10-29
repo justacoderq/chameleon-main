@@ -5,6 +5,11 @@ elements) for a new canvas, such as a square post turned into a 728×90 leaderbo
 or a 1080×1920 story. It runs fully offline in Docker, using a small local language
 model and deterministic, renderer-exact layout search.
 
+**Submission branch:** `combined-engine-merged`. For a concise judging walkthrough,
+reproduction commands, evidence, and limitations, start with the
+[review guide](docs/REVIEW_GUIDE.md). The mathematical rationale and its limits
+are in [technical rationale](docs/TECHNICAL_RATIONALE.md).
+
 Only `x`, `y`, `width`, `height` and text `font_size` change. IDs, element count,
 content, fonts, colours, opacity, z-order, groups, assets and image fit are
 preserved exactly. Images keep their aspect ratio. Nothing is placed off-canvas.
@@ -174,9 +179,9 @@ python -m venv .venv && .venv/bin/pip install -r requirements-dev.txt -r require
 
 ## Verification
 
-- **Unit tests:** `pytest -q` runs 103 tests: contract invariants, mutations
-  (renamed IDs, long copy, rotation), extreme aspect ratios, an official-renderer
-  round trip and live model integration.
+- **Unit tests:** `pytest -q` collects 106 tests; the recorded run had 105 passed
+  and one opt-in live-model test skipped. To run that real local-model test too,
+  set `CHAMELEON_TEST_LIVE_MODEL=1` before running pytest.
 - **Benchmark:** `python -m evaluation.run --split {samples,dev,holdout}` runs a
   contract audit plus an HTML gallery of source, naive stretch and result.
   - Samples: 3/3 valid, 0 text overflows.
@@ -189,18 +194,26 @@ python -m venv .venv && .venv/bin/pip install -r requirements-dev.txt -r require
   They include asset names the engine has never seen. Each design runs at 21
   platform formats, 5,040 cases in all:
   - 0 crashes, 0 invalid outputs, 0 text overflows
-  - our layout engine ships in 99% of cases (4,980 of 5,040)
+  - reflow was selected for 4,980 cases; partition search was selected for 60
+  - local quality proxies still flag small text in 846 cases and possible
+    collisions in 329; viewer heuristics also flag 56 hierarchy cases and 7 new
+    text-over-image overlaps. These are not confirmed human-judged defects.
 - **Mutation suite:** `python -m evaluation.stress --suite mutations` runs the
   samples, their mutations and 200 synthetic designs at 35 sizes from 50×50 to
   4000×4000, 10,570 cases in all:
-  - 0 crashes, 0 invalid outputs
-  - outputs identical on every rerun (`STRESS_DETERMINISM=1`)
+  - 0 crashes, 0 invalid outputs; 2 measured text-overflow cases, both from an
+    extreme long-copy mutation at 50×50 and 72×90
+  - quality proxies flag small text in 2,307 cases and possible collisions in
+    303; viewer heuristics flag 35 new text-over-image overlaps, 57 near-invisible
+    images and 260 hierarchy cases
+  - optional byte-for-byte repeat checks are enabled with `STRESS_DETERMINISM=1`
 - **Visual review:** `python -m evaluation.contact_sheet out.png 1 2 3` renders
   designs at several formats with the official renderer.
 - **Docker:** the image builds, and runs with `--network none` exactly as above.
   The model is used for every task. The 3 samples and the samples at 15 real
   platform formats (Instagram, Story, YouTube, LinkedIn, IAB ad sizes and more) are
-  all valid, 51/51.
+  recorded as valid, 51/51 in [`docs/RESULTS.md`](docs/RESULTS.md). Rebuild and
+  rerun the documented Docker check on the exact submission commit before judging.
 
 These are local proxies. They are not the organizers' AI evaluation.
 
@@ -227,14 +240,14 @@ Each bug below was found by the stress or hidden-style suites, fixed, and re-ver
 
 ## Known limits
 
+- In the latest official-renderer sample run, the advanced 728×90 output had
+  seven text elements below 10 px. The JSON is structurally valid, but those
+  elements are not comfortably readable; see [`docs/RESULTS.md`](docs/RESULTS.md).
 - On very small banners (320×50, 72×90), long copy can only fit as fine print.
 - The FLAN role labels are noisy, so they are used only as a light hint.
-- Natively, a design takes about 0.2 s on average and about 1 s for the most
-  complex sample, plus a one-time model load of a few seconds. Under amd64
-  emulation on Apple silicon (Colima/qemu), the 48 platform-format tasks took
-  about 15 s each. Each resize has a fixed work budget, so a very busy design
-  (about 100 elements, or a dozen loose labels into a thin banner) still finishes
-  in about 2 s natively.
+- A four-worker hidden-style run on the current development machine measured
+  0.585 s mean, 6.921 s p99, and 27.573 s maximum per case. This is not a
+  benchmark of the organizer's reference hardware; see [`docs/RESULTS.md`](docs/RESULTS.md).
 
 ## Files
 
@@ -245,4 +258,5 @@ Each bug below was found by the stress or hidden-style suites, fixed, and re-ver
 - `evaluation/`: contract audit, synthetic cases, review gallery.
 - `tests/`: test suite.
 - `addon/`, `engine/service.py`: Express preview panel (see `docs/EXPRESS.md`).
-- `docs/`: architecture notes, results, requirements mapping, pitch.
+- `docs/`: reviewer guide, technical rationale, architecture, results, requirements,
+  and pitch.

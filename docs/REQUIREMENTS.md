@@ -1,38 +1,34 @@
-# Brief-to-deliverable map
+# Submission readiness and evidence
 
-Source: Final Chameleon Challenge.pdf, especially pages 5-8 and 10-14.
+The [challenge brief](../Final%20Chameleon%20Challenge.pdf) describes stage one
+as an offline containerized engine evaluated on hidden designs across all three
+difficulty levels. The output JSON and the official-rendered PNG both matter.
+This table maps those requirements to this repository without treating local
+proxies as the organizer's score.
 
-| Brief requirement | Implementation / evidence | Remaining work |
-| --- | --- | --- |
-| Standalone source+target to resized JSON | engine.resize.resize, batch main | Hidden official evaluation |
-| Same elements/IDs, no asset regeneration | Deep copies, immutable-field audit, tests | Official scorer confirmation |
-| Preserve copy/font families/brand properties | Only geometry/font size change | Pixel-level font parity |
-| Images proportional and rotated bounds inside | Uniform image/group transforms, rotated audit | More real designs |
-| Readable, intentional layouts | Structure-aware reflow (preserve/stack/split/row) refereed against partition search; renderer-exact text fitting | Fine print on the smallest banners |
-| Offline local model | Bundled FLAN snapshot, required mode, socket-blocked inference test | Organizer model approval |
-| Standard container | Dockerfile, build-time weights, offline environment | Verified: FAQ command, `--network none`, 51/51 tasks valid |
-| Official PNG output | Explicit official renderer entry point, cr-renderer pinned | Verified locally and in Docker |
-| Engine README | README.md and architecture notes | Freeze dependency lock after verified build |
-| Adobe engineering explanation | Architecture, results and work log | Live walkthrough |
-| Express add-on | Panel + local engine service + SDK image insertion | Panel verified in Chrome; Adobe-host validation |
-| Short pitch | docs/PITCH.md | Rehearse with measured live outputs |
-| Brief demo video | Generated AVI walkthrough, reproducible script | Player QA; live Express recording for finale |
+| Requirement | Implementation / evidence | Status and limitation |
+|---|---|---|
+| Accept a source design and target canvas; return resized JSON | `engine.resize.resize`; `engine.main` batch entry point | Implemented and exercised on all three supplied samples |
+| Preserve elements, IDs, and immutable design properties | Deep-copy candidate construction; `evaluation/audit.py`; contract tests | Checked by the local audit; not a substitute for the organizer's validator |
+| Keep geometry on-canvas and images in proportion | rotated-bounds and image-ratio checks; image/group sizing helpers | Tested locally; cover-fit images retain their declared crop behavior |
+| Produce judge-visible images with the official renderer | pinned `cr-renderer`; `engine.preview.render`; official-renderer test | Latest local run rendered all three samples successfully |
+| Readable, intentional layouts across target sizes | structure-aware candidates, scoring, independent partition search, audit referee | Not guaranteed. The 728×90 sample still has seven text elements below 10 px |
+| Offline execution with a local model | pinned `google/flan-t5-small`; required/auto/off modes; socket-blocked model test | Actual local inference passed. Info-session notes favor small, swappable public models; follow newer organizer guidance |
+| Standard container and no runtime network | `Dockerfile`; build-time model preparation; offline runtime environment | A prior macOS run is recorded in `docs/RESULTS.md`; rebuild the exact submission commit before delivery |
+| Generalize beyond supplied samples | `evaluation.hidden_cases`, `evaluation.stress`, mutation and synthetic suites | Local generated cases only; not the organizer's hidden set or independent human designs |
+| Explain how to inspect and run the submission | `README.md`, `docs/REVIEW_GUIDE.md`, `docs/TECHNICAL_RATIONALE.md` | Reviewer commands and limitations are documented |
 
-The Express panel accepts structured Chameleon JSON and inserts its rendered result
-as one image. It does not extract an arbitrary native Express document or import output
-as individually editable Express nodes. The JSON download preserves the separate elements.
+The brief places the full Adobe Express add-on, pitch, and demo video in the
+finale deliverables. The repository includes an optional preview panel, but it
+inserts a flattened PNG and does not import editable native Express elements.
+That scope should not be confused with the stage-one engine.
 
-## Ambiguities to confirm, without inventing rules
+## Readiness judgment
 
-- The exact approved model list and parameter/size limit are absent from the supplied brief
-  ("being finalized"). FLAN-T5-small is 77M parameters; `--model off` runs without it.
-- Reference hardware is described as Apple M5 Pro but CPU/RAM/GPU limits are unfinished.
-- The provided Docker command uses linux/amd64; confirm how this maps to the reference Mac.
-- The complete target catalogue, weighted rubric, code-freeze date and submission portal
-  are not provided. Development target sizes are representative, not an official catalogue.
-- FAQ.md references a stage-one viewer, but PDF page 8 places the add-on in the finale.
-- The finale creativity section mentions imagery regeneration, while page 12 calls it
-  disqualifying. This baseline always preserves the supplied assets.
-
-Do not claim submission readiness until official rendering, offline Docker execution,
-model eligibility and the organizer's delivery instructions are confirmed.
+The code and reviewer materials are organized for inspection, and the supplied
+samples pass the current local structural checks. This is **not evidence of an
+official score or a prediction of finalist selection**. Before submitting,
+rebuild and run Docker from this exact commit with networking disabled, inspect
+the rendered outputs—especially the advanced banner—and confirm the latest
+organizer model guidance. See [`docs/RESULTS.md`](RESULTS.md) for precise
+verification details.

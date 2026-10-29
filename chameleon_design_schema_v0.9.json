@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://adobe.com/chameleon/schema/v0.9/design.json",
-  "title": "CHAMELEON Design Document (v0.9 \u2014 provisional, pending Peter's sign-off)",
+  "title": "CHAMELEON Design Document (v0.9)",
   "description": "A single design: a canvas plus its list of elements. Used both for the SOURCE design the engine receives and the RESIZED design it returns \u2014 same shape, different values.",
   "type": "object",
   "required": ["canvas", "elements"],

@@ -31,9 +31,13 @@ a deployed engine strategy and authentication. No public deployment was performe
 ## Verification status
 
 Panel JavaScript syntax, manifest/DOM references, service validation and generated PNG
-responses are tested locally. Browser discovery returned no connected browser, so no
-UI clicks, screenshots of this panel, or Adobe host behavior have been verified yet.
-Tests of the HTTP service do not substitute for browser or Adobe integration tests.
+responses are tested locally. A prior local Chrome walkthrough is recorded in
+`docs/RESULTS.md`; the Adobe Express-hosted integration remains unverified. The current
+browser session cannot reproduce the prior walkthrough. Tests of the HTTP service do not
+substitute for Adobe-host integration tests.
+
+The supplied challenge brief lists the full Express add-on as a finale deliverable.
+This panel is supplementary to the stage-one engine and inserts a flattened preview.
 
 References: [Adobe add-on development](https://developer.adobe.com/express/add-ons/docs/guides/getting-started/hello-world),
 [local network access FAQ](https://developer.adobe.com/express/add-ons/docs/guides/support/faq),

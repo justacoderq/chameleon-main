@@ -17,8 +17,11 @@ readable, and we show that trade-off openly.
 
 The preview panel lets someone choose a canvas, compare the result with the original,
 and export the design. The Express integration adds the rendered preview to the document.
-We stress-tested 10,573 resizes with zero invalid outputs, and the README lists the
-bugs that testing caught.
+The generated hidden-style suite covers 5,040 cases with zero measured text
+overflows. A separate 10,570-case mutation suite had zero crashes and invalid
+outputs, but did find two overflows in an extreme long-copy mutation on tiny
+canvases. These generated local proxies are not the organizer's hidden test
+set; the README and results report include the quality warnings and limitations.
 
 ## Demo sequence
 
