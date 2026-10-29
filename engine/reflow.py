@@ -107,8 +107,40 @@ def _wrap_panels(source: dict, out: dict, bg_ids, W: int, H: int) -> None:
         y0 = max(0.0, o0[1] - (s0[1] - pr[1]) * k)
         x1 = min(float(W), o0[2] + (pr[2] - s0[2]) * k)
         y1 = min(float(H), o0[3] + (pr[3] - s0[3]) * k)
+        # a band that reached the canvas edge in the source (a footer strip, a
+        # side bar) reaches it again, as long as that doesn't run it under
+        # other content
+        W0, H0 = float(source["canvas"]["width"]), float(source["canvas"]["height"])
+        others = [el_rect(o) for o in out["elements"] if o["id"] not in inside and o is not e
+                  and o["id"] not in bg_ids and not _is_decor(src[o["id"]], W0, H0)]
+
+        def free(r):
+            return not any(inter(q, r) > 1 for q in others)
+
+        if pr[0] <= 0.02 * W0 and pr[2] >= 0.98 * W0 and free((0.0, y0, float(W), y1)):
+            x0, x1 = 0.0, float(W)
+        if pr[1] <= 0.02 * H0 and pr[3] >= 0.98 * H0 and free((x0, 0.0, x1, float(H))):
+            y0, y1 = 0.0, float(H)
+        if x0 == 0.0 and x1 == float(W):
+            if pr[3] >= 0.98 * H0 and H - y1 <= y1 - y0 and free((x0, y1, x1, float(H))):
+                y1 = float(H)
+            if pr[1] <= 0.02 * H0 and y0 <= y1 - y0 and free((x0, 0.0, x1, y0)):
+                y0 = 0.0
+        if y0 == 0.0 and y1 == float(H):
+            if pr[2] >= 0.98 * W0 and W - x1 <= x1 - x0 and free((x1, y0, float(W), y1)):
+                x1 = float(W)
+            if pr[0] <= 0.02 * W0 and x0 <= x1 - x0 and free((0.0, y0, x0, y1)):
+                x0 = 0.0
         if x1 - x0 >= 1 and y1 - y0 >= 1:
             e.update(x=x0, y=y0, width=x1 - x0, height=y1 - y0)
+
+
+def _is_decor(s: dict, W0: float, H0: float) -> bool:
+    """Full-canvas layers and faint ungrouped shapes or lines: things content may sit on."""
+    if s.get("type") != "text" and s.get("width", 0) >= 0.9 * W0 and s.get("height", 0) >= 0.9 * H0:
+        return True
+    return s.get("type") == "shape" and not s.get("group_id") and \
+        (float(s.get("opacity", 1)) <= 0.3 or s.get("shape_type") == "line")
 
 
 # --------------------------------------------------------------------------

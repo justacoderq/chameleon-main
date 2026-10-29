@@ -223,6 +223,7 @@ Each bug below was found by the stress or hidden-style suites, fixed, and re-ver
 | Divider lines vanished on thin banners (scaled to 0.3 px) | shapes scaled like everything else | shapes keep at least 1 px where the source had it |
 | A dark panel floated in empty space while the text it backed sat elsewhere | a translucent panel was treated as decoration and moved out of the way | a rectangle that held content in the source is wrapped around that content |
 | A photo collage shattered into scattered specks | intentional image overlaps were avoided like collisions | overlapping images form one cluster that moves and scales together; the audit treats overlap the source already had as intentional |
+| A full-width footer bar shrank into a small box | the bar was wrapped tightly around its label like a card | a bar that ran edge to edge in the source runs edge to edge again, and snaps back to the edge it sat on, whenever nothing else is in its way |
 
 ## Known limits
 

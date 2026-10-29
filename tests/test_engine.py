@@ -204,3 +204,24 @@ def test_grouped_layout_stays_within_canvas_on_small_landscape_target():
         assert e["x"] >= -0.01 and e["y"] >= -0.01
         assert e["x"] + e["width"] <= target["width"] + 0.01
         assert e["y"] + e["height"] <= target["height"] + 0.01
+
+
+@pytest.mark.parametrize("size", [(1080, 1920), (1200, 630), (300, 250)])
+def test_full_width_footer_bar_stays_full_width(size):
+    task = json.loads((ROOT / "input/chameleon_sample_level2_core.json").read_text())
+    source = deepcopy(task["source"])
+    source["canvas"]["height"] = 1180
+    source["elements"][0]["height"] = 1180
+    source["elements"] += [
+        {"id": "footer_bg", "type": "shape", "x": 0, "y": 1090, "width": 1080, "height": 90, "z_index": 2,
+         "shape_type": "rectangle", "fill_color": "rgba(240,178,66,1)"},
+        {"id": "footer_text", "type": "text", "x": 140, "y": 1118, "width": 800, "height": 34, "z_index": 4,
+         "font_family": "Solstice Sans", "font_size": 24, "font_weight": "bold", "color": "rgba(40,20,40,1)",
+         "text_align": "center", "content": "FREE SHIPPING ON ORDERS OVER $40"}]
+    target = dict(zip(("width", "height"), size))
+    output = resize(source, target)
+    assert audit(source, output, target)["hard_errors"] == []
+    bar = next(e for e in output["elements"] if e["id"] == "footer_bg")
+    label = next(e for e in output["elements"] if e["id"] == "footer_text")
+    assert bar["x"] == 0 and bar["width"] == target["width"]
+    assert bar["y"] <= label["y"] and label["y"] + label["height"] <= bar["y"] + bar["height"]
