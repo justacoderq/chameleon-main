@@ -28,6 +28,12 @@ from .analyze import Analysis, Block, Rect, area, el_rect, inter, source_lines, 
 from .measure import asset_visible_fraction, get_measurer
 
 INF = float("inf")
+# Deterministic effort budget per resize, counted in stack measurements. Normal
+# designs need < 50k (the level 3 sample into 728x90 needs ~45k); designs with a
+# dozen-plus loose text items into thin banners could need ~1M (10+ s). Past the
+# budget, no new candidates are started and the best one so far ships.
+WORK_CAP = 120_000
+MAX_COLUMN_SPLITS = 36
 
 
 # --------------------------------------------------------------------------
@@ -61,6 +67,7 @@ class Ctx:
         self.gmin = max(3.0, 0.014 * short)
         self.measurer = get_measurer()
         self.sized_cache: Dict[tuple, "Sized"] = {}
+        self.work = 0  # stack measurements so far (a deterministic effort budget)
 
     def minf_for(self, el: dict) -> float:
         floor = self.minf_floor if el.get("id") in self.demoted else self.minf
@@ -363,6 +370,7 @@ class Layout:
 # --------------------------------------------------------------------------
 
 def _stack_measure(items: List[Block], s: float, rw: float, rh: float, ctx: Ctx, widen, img_k):
+    ctx.work += 1
     sized = [size_block(b, s, rw, rh, ctx, widen, img_k) for b in items]
     gaps = []
     for i in range(1, len(items)):
@@ -569,8 +577,20 @@ def _split_columns(items: List[Block], tw: float, rh: float, k: int, gap: float,
         d = sum(len(str(t.get("content", ""))) * float(t.get("font_size", 16)) ** 2 for t in b.texts())
         return d + (0.0 if b.kind == "text" else 0.4 * b.w * b.h)
 
+    splits = list(combinations(range(1, n), k - 1))
+    if len(splits) > MAX_COLUMN_SPLITS:
+        d = [max(1.0, demand(b)) for b in items]
+
+        def imbalance(cuts):
+            bounds = (0,) + cuts + (n,)
+            loads = [sum(d[bounds[i]:bounds[i + 1]]) for i in range(k)]
+            return (max(loads) / sum(loads), cuts)
+
+        splits = sorted(sorted(splits, key=imbalance)[:MAX_COLUMN_SPLITS])
     best = None
-    for cuts in combinations(range(1, n), k - 1):
+    for cuts in splits:
+        if ctx.work > WORK_CAP:
+            break
         bounds = (0,) + cuts + (n,)
         chunks = [items[bounds[i]:bounds[i + 1]] for i in range(k)]
         # columns sized by how much they hold (text needs width to stay short)
@@ -687,6 +707,8 @@ def with_demotions(ctx: Ctx, blocks: List[Block], builder: Callable[[List[Block]
     floor = ctx.minf_floor
     try:
         for _ in range(len(order) + 1):
+            if ctx.work > WORK_CAP:
+                return None
             lay = builder(blocks)
             if lay is not None:
                 lay.dropped = list(demoted)
@@ -780,7 +802,9 @@ def candidates(ctx: Ctx) -> List[Layout]:
     A0 = ctx.an.W0 / ctx.an.H0
     out: List[Layout] = []
 
-    def add_one(builder):
+    def add_one(builder, always=False):
+        if ctx.work > WORK_CAP and not always:
+            return
         try:
             lay = with_demotions(ctx, blocks, builder)
         except Exception:
@@ -792,14 +816,14 @@ def candidates(ctx: Ctx) -> List[Layout]:
             score_layout(ctx, lay, blocks)
             out.append(lay)
 
-    def add(builder):
+    def add(builder, always=False):
         for vis in (True, False):
             ctx.visible_fp = vis
-            add_one(builder)
+            add_one(builder, always)
         ctx.visible_fp = True
 
     for k in (1.0, 1.12, 1.25):
-        add(lambda bl, k=k: build_preserve(ctx, bl, k))
+        add(lambda bl, k=k: build_preserve(ctx, bl, k), always=True)
     if A < 2.6:
         for inline in (False, True):
             for img_k in (1.0, 0.75, 0.55):
