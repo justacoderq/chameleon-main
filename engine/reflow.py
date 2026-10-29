@@ -70,7 +70,45 @@ def emit(source: dict, an, ctx: Ctx, best) -> dict:
         out_els.append(e)
     out = {"canvas": {"width": W, "height": H}, "elements": out_els}
     _finalize(out, W, H)
+    _wrap_panels(source, out, bg_ids, W, H)
     return out
+
+
+def _wrap_panels(source: dict, out: dict, bg_ids, W: int, H: int) -> None:
+    """A rectangle that sat behind other elements in the source (a card or a
+    translucent panel under the copy) belongs to them: wrap it around where
+    they ended up, keeping its padding in proportion, instead of placing it on
+    its own."""
+    src = {e["id"]: e for e in source["elements"]}
+    outs = {e["id"]: e for e in out["elements"]}
+    for e in out["elements"]:
+        s = src[e["id"]]
+        if (e.get("type") != "shape" or s.get("shape_type", "rectangle") != "rectangle" or e["id"] in bg_ids
+                or s.get("group_id") or abs(float(s.get("rotation") or 0)) > 0.5):
+            continue
+        pr = el_rect(s)
+        inside = []
+        for o in source["elements"]:
+            if o is s or float(o.get("z_index", 0)) <= float(s.get("z_index", 0)):
+                continue
+            r = el_rect(o)
+            a = max(0.0, r[2] - r[0]) * max(0.0, r[3] - r[1])
+            if a > 0 and inter(r, pr) >= 0.9 * a:
+                inside.append(o["id"])
+        if not inside:
+            continue
+        su = [el_rect(src[i]) for i in inside]
+        ou = [el_rect(outs[i]) for i in inside]
+        s0 = (min(r[0] for r in su), min(r[1] for r in su), max(r[2] for r in su), max(r[3] for r in su))
+        o0 = (min(r[0] for r in ou), min(r[1] for r in ou), max(r[2] for r in ou), max(r[3] for r in ou))
+        k = math.sqrt(max(1e-6, (o0[2] - o0[0]) / max(1e-6, s0[2] - s0[0])) *
+                      max(1e-6, (o0[3] - o0[1]) / max(1e-6, s0[3] - s0[1])))
+        x0 = max(0.0, o0[0] - (s0[0] - pr[0]) * k)
+        y0 = max(0.0, o0[1] - (s0[1] - pr[1]) * k)
+        x1 = min(float(W), o0[2] + (pr[2] - s0[2]) * k)
+        y1 = min(float(H), o0[3] + (pr[3] - s0[3]) * k)
+        if x1 - x0 >= 1 and y1 - y0 >= 1:
+            e.update(x=x0, y=y0, width=x1 - x0, height=y1 - y0)
 
 
 # --------------------------------------------------------------------------
