@@ -241,12 +241,20 @@ def _assign_roles(blocks: List[Block], W0: float, H0: float, fmax: float, fmin: 
     others = [b for b in images if not b.is_logo]
     if others:
         hero = max(others, key=lambda b: area(b.rect))
-        if area(hero.rect) >= 0.03 * A0:
+
+        def beside(a: Block, b: Block) -> bool:
+            ov = min(a.rect[3], b.rect[3]) - max(a.rect[1], b.rect[1])
+            return ov >= 0.5 * min(a.h, b.h)
+
+        # several equal images side by side (a product line-up) have no single
+        # hero: they stay together as a row of equals
+        peers = [b for b in others if b is not hero and area(b.rect) >= 0.66 * area(hero.rect) and beside(hero, b)]
+        if area(hero.rect) >= 0.03 * A0 and not peers:
             hero.is_hero = True
             hero.priority = 0.75
         for b in others:
             if not b.is_hero:
-                b.priority = 0.5
+                b.priority = 0.7 if (peers and (b is hero or b in peers)) else 0.5
 
     headline_done = False
     for b in sorted([b for b in blocks if b.kind == "text"], key=lambda b: (-float(b.els[0].get("font_size", 16)), b.rect[1])):
