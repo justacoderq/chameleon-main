@@ -35,7 +35,7 @@ flowchart LR
     F --> SC["score"]
     SC --> R{"referee"}
     PS["partition search<br/>(independent engine)"] --> R
-    R --> Z["finalize<br/>text boxes · background<br/>decor · missing asset"]
+    R --> Z["finalize<br/>text boxes · background<br/>decor"]
     Z --> O["output JSON"]
 ```
 
@@ -112,8 +112,45 @@ flowchart TD
   the canvas.
 - The background is re-fitted.
 - Decorations are moved away from content.
-- A missing-asset image would render as a grey placeholder. It can't be removed
-  without breaking the ID contract, so it is tucked behind an opaque element.
+- Every element stays visible. An image whose file is not in the local brand kit
+  is laid out like any other image: scoring renders with the full asset set, and a
+  genuinely missing file shows as the renderer's placeholder.
+
+## Model, weights and operational limits
+
+| | |
+|---|---|
+| Model | [`google/flan-t5-small`](https://huggingface.co/google/flan-t5-small), 77M parameters, Apache-2.0 |
+| Pinned revision | `0fc9ddf78a1e988dac52e2dac162b0ede4fd74ab` (SHA-256 of every file in `models/manifest.json`) |
+| Weights on disk | 297 MB (`model.safetensors` 308 MB raw), downloaded once at `docker build` by `scripts/prepare_flan.py` |
+| Fine-tuning | none: the public checkpoint is used as is |
+| Runtime | CPU only, no GPU, no network; `torch` is limited to 4 threads |
+| What it does | labels each text as headline, body, CTA, legal or label, by ranking those five fixed words by likelihood. It never generates free text and never produces geometry |
+| Influence | a light nudge to block priorities. All layout decisions are geometric and deterministic |
+
+**Swapping the model.** The model is optional and replaceable without code changes:
+
+- `CHAMELEON_MODEL_MODE=off` runs the purely geometric engine with no model at all.
+  All 3 samples are still valid in this mode.
+- `CHAMELEON_MODEL_MODE=auto` uses the model when present and falls back to
+  geometry if it isn't.
+- `CHAMELEON_MODEL_MODE=required` fails loudly if the model can't run. The Docker
+  image uses this mode so a broken build can't pass silently.
+- `CHAMELEON_MODEL_PATH` points at another local Hugging Face seq2seq checkpoint
+  directory (loaded with `AutoModelForSeq2SeqLM`), or at a `.gguf` file for the
+  optional llama.cpp adapter (`requirements-gguf.txt`). Only `flan-t5-small` has
+  been verified.
+
+**Measured footprint** (3 samples on Apple silicon, official rendering included):
+
+| | model on | model off |
+|---|---|---|
+| Peak memory | 822 MB | 398 MB |
+| Wall time for 3 designs, including model load | 11.1 s | 4.9 s |
+| Layout time per design | about 0.2 s average, about 1 s for the most complex | same |
+
+The Docker image is 4.2 GB, almost all of it PyTorch and the model, and needs no
+network at run time.
 
 ## Run
 
@@ -164,7 +201,7 @@ Each bug below was found by the stress run, fixed, and re-verified on all cases:
 |---|---|---|
 | Long copy fell back to an overlapping layout | the scale search assumed "fits at a large scale" implies "fits at a small one", which is false for buttons with long labels | scan down for the largest scale that actually fits |
 | Rotated headline outside a 2000×90 banner (hard contract failure) | final pass ignored the rotated footprint | shrink rotated text until its rotated box fits |
-| Grey missing-asset placeholder visible on 320×50 | fallback output never hid it | hide the placeholder in every output |
+| A product image under an unfamiliar filename shrank to a 54 px speck | images absent from the local brand kit were treated as missing and tucked away; the judges' kit has the real files | every image is laid out as content, so every element stays visible |
 | Product image shrunk to 0.3 px | images were the only thing allowed to shrink | minimum visible image size |
 | Font sizes like `23.7` | renderer draws `int(font_size)`, so measured ≠ drawn | whole-pixel font sizes |
 | Headline box doubled in height inside Docker only | Docker's skia build measures about 1% wider, so tightly sized text wrapped a word early | widen the box a few percent before adding a line |
