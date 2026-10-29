@@ -91,7 +91,7 @@ flowchart LR
 **4. Referee.** `engine/resize.py` also runs an independent grid/partition
 search and keeps whichever output passes the contract audit
 (`evaluation/audit.py`) with fewer problems. The structure-aware engine wins in
-about 96–98% of test cases. The partition search is a safety net for extreme
+about 96–99% of test cases. The partition search is a safety net for extreme
 shapes.
 
 ```mermaid
@@ -189,7 +189,7 @@ python -m venv .venv && .venv/bin/pip install -r requirements-dev.txt -r require
   They include asset names the engine has never seen. Each design runs at 21
   platform formats, 5,040 cases in all:
   - 0 crashes, 0 invalid outputs, 0 text overflows
-  - our layout engine ships in 98% of cases
+  - our layout engine ships in 99% of cases (4,980 of 5,040)
 - **Mutation suite:** `python -m evaluation.stress --suite mutations` runs the
   samples, their mutations and 200 synthetic designs at 35 sizes from 50×50 to
   4000×4000, 10,570 cases in all:
@@ -221,6 +221,8 @@ Each bug below was found by the stress or hidden-style suites, fixed, and re-ver
 | A row of equal products broke apart: one blown up, the rest shrunk | the largest image always became the hero, even with equal neighbours | equal images side by side stay a row of equals |
 | 12–16 s for a design with a dozen loose labels into a 728×90 banner | every 3-column split was tried for every demotion retry | a deterministic effort budget and the 36 most balanced splits: about 2.5 s, other outputs byte-identical |
 | Divider lines vanished on thin banners (scaled to 0.3 px) | shapes scaled like everything else | shapes keep at least 1 px where the source had it |
+| A dark panel floated in empty space while the text it backed sat elsewhere | a translucent panel was treated as decoration and moved out of the way | a rectangle that held content in the source is wrapped around that content |
+| A photo collage shattered into scattered specks | intentional image overlaps were avoided like collisions | overlapping images form one cluster that moves and scales together; the audit treats overlap the source already had as intentional |
 
 ## Known limits
 
