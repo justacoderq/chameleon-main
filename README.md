@@ -195,7 +195,7 @@ These are local proxies. They are not the organizers' AI evaluation.
 
 ### What stress testing caught
 
-Each bug below was found by the stress run, fixed, and re-verified on all cases:
+Each bug below was found by the stress or hidden-style suites, fixed, and re-verified:
 
 | Symptom | Cause | Fix |
 |---|---|---|
@@ -205,6 +205,11 @@ Each bug below was found by the stress run, fixed, and re-verified on all cases:
 | Product image shrunk to 0.3 px | images were the only thing allowed to shrink | minimum visible image size |
 | Font sizes like `23.7` | renderer draws `int(font_size)`, so measured ≠ drawn | whole-pixel font sizes |
 | Headline box doubled in height inside Docker only | Docker's skia build measures about 1% wider, so tightly sized text wrapped a word early | widen the box a few percent before adding a line |
+| A letter-spaced 119 px poster headline shrank to 16 px, below the date line | the renderer wraps on glyph widths and adds spacing when drawing; we counted the spacing as overflow, so only a one-line fit passed | judge overflow as the renderer wraps; narrow the wrap width until the drawn lines fit |
+| A poster's button grew larger than its headline | the audit counts spacing while wrapping, flagged the spaced headline, and the referee shipped the fallback engine | widen the box for the audit only when the renderer would break lines identically |
+| A row of equal products broke apart: one blown up, the rest shrunk | the largest image always became the hero, even with equal neighbours | equal images side by side stay a row of equals |
+| 12–16 s for a design with a dozen loose labels into a 728×90 banner | every 3-column split was tried for every demotion retry | a deterministic effort budget and the 36 most balanced splits: about 2.5 s, other outputs byte-identical |
+| Divider lines vanished on thin banners (scaled to 0.3 px) | shapes scaled like everything else | shapes keep at least 1 px where the source had it |
 
 ## Known limits
 

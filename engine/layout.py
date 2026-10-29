@@ -28,11 +28,12 @@ from .analyze import Analysis, Block, Rect, area, el_rect, inter, source_lines, 
 from .measure import asset_visible_fraction, get_measurer
 
 INF = float("inf")
-# Deterministic effort budget per resize, counted in stack measurements. Normal
-# designs need < 50k (the level 3 sample into 728x90 needs ~45k); designs with a
-# dozen-plus loose text items into thin banners could need ~1M (10+ s). Past the
-# budget, no new candidates are started and the best one so far ships.
-WORK_CAP = 120_000
+# Deterministic effort budget per resize, counted in blocks sized by stack
+# measurements. Normal designs need < 160k (the level 3 sample into 728x90 is the
+# heaviest seen); a dozen-plus loose labels or ~100 elements into thin banners
+# could need millions (10+ s). Past the budget no new candidates are started and
+# the best one so far ships.
+WORK_CAP = 250_000
 MAX_COLUMN_SPLITS = 36
 
 
@@ -265,34 +266,44 @@ def size_row(b: Block, s: float, max_w: float, max_h: float, ctx: Ctx, widen) ->
     src_gaps = [b.children[i + 1].rect[0] - b.children[i].rect[2] for i in range(len(b.children) - 1)]
     sg = sorted(src_gaps)[len(src_gaps) // 2] if src_gaps else 20
     gap = max(ctx.gmin, max(0.0, sg) * min(kid.eff for kid in kids))
+    # element boxes can stick out past the visible footprint (transparent image
+    # padding): space neighbours so their boxes never overlap, not just their pixels
+    def hgap(a: Sized, c: Sized) -> float:
+        return max(gap, a.pads()[2] + c.pads()[0] + 0.5) if (a.pads()[2] or c.pads()[0]) else gap
+
     lines: List[List[Sized]] = [[]]
     lw = 0.0
     for k in kids:
-        need = k.w if not lines[-1] else lw + gap + k.w
+        need = k.w if not lines[-1] else lw + hgap(lines[-1][-1], k) + k.w
         if lines[-1] and need > max_w:
             lines.append([k])
             lw = k.w
         else:
             lines[-1].append(k)
             lw = need
-    widths = [sum(k.w for k in ln) + gap * (len(ln) - 1) for ln in lines]
+    widths = [sum(k.w for k in ln) + gap * (len(ln) - 1) + sum(hgap(a, c) - gap for a, c in zip(ln, ln[1:]))
+              for ln in lines]
     W = max(widths)
     geo, vis, fonts = {}, [], []
     y = 0.0
     ok = True
-    for ln, lw in zip(lines, widths):
+    for li, (ln, lw) in enumerate(zip(lines, widths)):
         x = (W - lw) / 2
         lh = max(k.h for k in ln)
-        for k in ln:
+        for j, k in enumerate(ln):
             oy = y + (lh - k.h) / 2
             for i, g in k.geo.items():
                 geo[i] = {**g, "x": g["x"] + x, "y": g["y"] + oy}
             vis.extend((a + x, bb + oy, c + x, d + oy) for a, bb, c, d in k.vis)
             fonts.extend(k.fonts)
             ok = ok and k.ok
-            x += k.w + gap
-        y += lh + gap
-    return Sized(b, W, y - gap, geo, vis, min(k.eff for k in kids), ok, fonts)
+            x += k.w + (hgap(k, ln[j + 1]) if j + 1 < len(ln) else 0.0)
+        y += lh
+        if li + 1 < len(lines):
+            nxt = lines[li + 1]
+            vpad = max(k.pads()[3] for k in ln) + max(k.pads()[1] for k in nxt)
+            y += max(gap, vpad + 0.5) if vpad else gap
+    return Sized(b, W, y, geo, vis, min(k.eff for k in kids), ok, fonts)
 
 
 def size_block(b: Block, s: float, max_w: float, max_h: float, ctx: Ctx,
@@ -370,7 +381,7 @@ class Layout:
 # --------------------------------------------------------------------------
 
 def _stack_measure(items: List[Block], s: float, rw: float, rh: float, ctx: Ctx, widen, img_k):
-    ctx.work += 1
+    ctx.work += max(1, len(items))
     sized = [size_block(b, s, rw, rh, ctx, widen, img_k) for b in items]
     gaps = []
     for i in range(1, len(items)):
