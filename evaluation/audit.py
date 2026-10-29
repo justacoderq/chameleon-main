@@ -76,6 +76,16 @@ def audit(source, output, target):
                 text, shape = (a,b) if a["type"] == "text" else (b,a)
                 if overlap(box(original[text["id"]]),box(original[shape["id"]])) >= original[text["id"]]["width"]*original[text["id"]]["height"]*.95:
                     continue
+            if {a["type"], b["type"]} <= {"image", "shape"}:
+                # Layering the source already had (a collage, a product on a card) is
+                # intentional, as long as the overlap hasn't grown much.
+                def frac(p, q):
+                    bp, bq = box(p), box(q)
+                    small = min((bp[2]-bp[0])*(bp[3]-bp[1]), (bq[2]-bq[0])*(bq[3]-bq[1]))
+                    return overlap(bp, bq) / small if small > 0 else 0.0
+                before = frac(original[a["id"]], original[b["id"]])
+                if before > 0.02 and frac(a, b) <= before + 0.1:
+                    continue
             if overlap(box(a), box(b)) > 1:
                 quality.append(a["id"] + "/" + b["id"] + ": possible collision")
     return {"hard_errors": hard, "quality_warnings": quality, "valid": not hard,

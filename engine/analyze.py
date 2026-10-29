@@ -178,6 +178,36 @@ def analyze(source: dict, roles: Optional[Dict[str, str]] = None) -> Analysis:
             used.update(id(t) for t in inside)
     singles = [e for e in singles if id(e) not in used]
 
+    # Implicit groups: images that overlap each other substantially (a collage, a
+    # product over a photo) are an intentional composition, not a collision to
+    # pull apart; they travel together like a designer's group.
+    imgs = [e for e in singles if e.get("type") == "image" and float(e.get("opacity", 1.0)) > 0.4]
+    parent = {id(e): id(e) for e in imgs}
+
+    def find(k):
+        while parent[k] != k:
+            parent[k] = parent[parent[k]]
+            k = parent[k]
+        return k
+
+    for i, a in enumerate(imgs):
+        ra = el_rect(a)
+        for b in imgs[i + 1:]:
+            rb = el_rect(b)
+            if inter(ra, rb) >= 0.15 * min(area(ra), area(rb)) > 0:
+                parent[find(id(a))] = find(id(b))
+    clusters: Dict[int, List[dict]] = {}
+    for e in imgs:
+        clusters.setdefault(find(id(e)), []).append(e)
+    cluster_ids = set()
+    for members in clusters.values():
+        if len(members) >= 2:
+            gid = f"__cluster_{members[0]['id']}"
+            groups[gid] = members
+            cluster_ids.add(gid)
+            used.update(id(m) for m in members)
+    singles = [e for e in singles if id(e) not in used]
+
     blocks: List[Block] = []
     for gid, members in groups.items():
         if len(members) == 1:
@@ -208,6 +238,9 @@ def analyze(source: dict, roles: Optional[Dict[str, str]] = None) -> Analysis:
     fmin = min(fonts) if fonts else fmax
 
     _assign_roles(blocks, W0, H0, fmax, fmin, roles)
+    for b in blocks:
+        if b.bid in cluster_ids:
+            b.priority = 0.8
     blocks = _build_rows(blocks, W0, H0)
     _assign_floaters(blocks, W0, H0)
     blocks.sort(key=lambda b: (b.rect[1], b.rect[0]))
