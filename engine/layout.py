@@ -346,13 +346,19 @@ def stack_fit(items: List[Block], rw: float, rh: float, ctx: Ctx, s_hi: float,
     ok, total, sized, gaps = _stack_measure(items, s_hi, rw, rh, ctx, widen, img_k)
     if ok and total <= rh:
         return s_hi, sized, gaps
-    lo, hi = 0.0, s_hi
-    best = None
-    ok, total, sized, gaps = _stack_measure(items, 1e-3, rw, rh, ctx, widen, img_k)
-    if not (ok and total <= rh):
+    # Feasibility isn't monotonic in scale: a rigid group with long copy can be
+    # legible only when large. Scan down for the largest feasible scale, then
+    # refine between it and the infeasible step above.
+    hi, best = s_hi, None
+    for s in [s_hi * 0.8 ** i for i in range(1, 25)] + [1e-3]:
+        ok, total, sized, gaps = _stack_measure(items, s, rw, rh, ctx, widen, img_k)
+        if ok and total <= rh:
+            best = (s, sized, gaps)
+            break
+        hi = s
+    if best is None:
         return None
-    best = (1e-3, sized, gaps)
-    lo = 1e-3
+    lo = best[0]
     for _ in range(18):
         mid = (lo + hi) / 2
         ok, total, sized, gaps = _stack_measure(items, mid, rw, rh, ctx, widen, img_k)
@@ -657,6 +663,11 @@ def with_demotions(ctx: Ctx, blocks: List[Block], builder: Callable[[List[Block]
         # last resort for extreme canvases: demoted copy becomes fine print
         ctx.minf_floor = 3.0
         lay = builder(blocks)
+        if lay is None:
+            # nothing fits even then: the headline may shrink too, rather than
+            # falling back to an unorganized layout
+            ctx.demoted |= {t["id"] for b in blocks for t in b.texts()}
+            lay = builder(blocks)
         if lay is not None:
             lay.dropped = list(demoted)
             lay.name += "-fineprint"

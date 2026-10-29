@@ -153,6 +153,25 @@ def _place_missing(e: dict, out_els: List[dict], ctx: Ctx, content) -> None:
     _place_decor_fixed(e, ctx, content)
 
 
+def hide_missing(out: dict) -> None:
+    """Tuck missing-asset placeholders of any finished layout behind an opaque
+    element (or into the quietest corner), as reflow does for its own."""
+    from types import SimpleNamespace
+    from .measure import asset_exists
+
+    W, H = int(out["canvas"]["width"]), int(out["canvas"]["height"])
+    els = out["elements"]
+    missing = [e for e in els if e.get("type") == "image" and not asset_exists(e.get("asset_id"))]
+    if not missing:
+        return
+    content = [(el_rect(o), 3.0 if o.get("type") == "text" else 1.0) for o in els
+               if o not in missing and not (o.get("width", 0) >= 0.9 * W and o.get("height", 0) >= 0.9 * H)]
+    ctx = SimpleNamespace(W=float(W), H=float(H))
+    for e in missing:
+        _place_missing(e, els, ctx, content)
+        _clamp(e, W, H)
+
+
 def _place_decor_fixed(e: dict, ctx: Ctx, content) -> None:
     w, h = float(e["width"]), float(e["height"])
     best = None
@@ -187,6 +206,8 @@ def _finalize(out: dict, W: int, H: int) -> None:
         if e.get("type") == "text":
             e["font_size"] = max(1, int(round(float(e.get("font_size", 1)))))
             _reconcile_text(e, W, H, measure)
+            if e.get("rotation"):
+                _fit_rotated_text(e, W, H, measure)
         _clamp(e, W, H)
 
 
@@ -217,6 +238,22 @@ def _reconcile_text(e: dict, W: int, H: int, measure) -> None:
         if e["font_size"] <= 1:
             return
         e["font_size"] -= 1
+
+
+def _fit_rotated_text(e: dict, W: int, H: int, measure) -> None:
+    """A rotated box's footprint grows with its width; shrink the font (and the
+    box to its text) until the rotated footprint fits on the canvas."""
+    for _ in range(120):
+        r = el_rect(e)
+        if (r[2] - r[0] <= W and r[3] - r[1] <= H) or e["font_size"] <= 1:
+            return
+        cx, cy = e["x"] + e["width"] / 2, e["y"] + e["height"] / 2
+        e["font_size"] -= 1
+        m = measure(e)
+        e["width"] = min(e["width"], m["width"] + 0.5)
+        e["height"] = m["height"] + 0.5
+        _reconcile_text(e, W, H, measure)
+        e["x"], e["y"] = cx - e["width"] / 2, cy - e["height"] / 2
 
 
 def _clamp(e: dict, W: int, H: int) -> None:
