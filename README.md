@@ -91,7 +91,7 @@ flowchart LR
 **4. Referee.** `engine/resize.py` also runs an independent grid/partition
 search and keeps whichever output passes the contract audit
 (`evaluation/audit.py`) with fewer problems. The structure-aware engine wins in
-about 96% of stress cases. The partition search is a safety net for extreme
+about 96–98% of test cases. The partition search is a safety net for extreme
 shapes.
 
 ```mermaid
@@ -182,10 +182,21 @@ python -m venv .venv && .venv/bin/pip install -r requirements-dev.txt -r require
   - Samples: 3/3 valid, 0 text overflows.
   - Dev and holdout: 72/72 valid each, 0 overflows.
   - The naive stretch is valid in only 4/72 dev cases.
-- **Stress:** 10,573 cases (the 3 samples, their mutations and 200 synthetic
-  designs, each at 35 targets from 50×50 to 4000×4000):
-  - 0 crashes, 0 invalid outputs, no image shrunk below visibility
-  - outputs identical on every rerun (deterministic)
+- **Hidden-style suite:** `python -m evaluation.stress --suite hidden` generates
+  240 designs from 12 archetypes that use every schema feature: product promo,
+  event poster, sale banner, quote card, product grid, text-heavy, collage,
+  testimonial, app ad, minimal, intentional layering and an adversarial case.
+  They include asset names the engine has never seen. Each design runs at 21
+  platform formats, 5,040 cases in all:
+  - 0 crashes, 0 invalid outputs, 0 text overflows
+  - our layout engine ships in 98% of cases
+- **Mutation suite:** `python -m evaluation.stress --suite mutations` runs the
+  samples, their mutations and 200 synthetic designs at 35 sizes from 50×50 to
+  4000×4000, 10,570 cases in all:
+  - 0 crashes, 0 invalid outputs
+  - outputs identical on every rerun (`STRESS_DETERMINISM=1`)
+- **Visual review:** `python -m evaluation.contact_sheet out.png 1 2 3` renders
+  designs at several formats with the official renderer.
 - **Docker:** the image builds, and runs with `--network none` exactly as above.
   The model is used for every task. The 3 samples and the samples at 15 real
   platform formats (Instagram, Story, YouTube, LinkedIn, IAB ad sizes and more) are
@@ -218,7 +229,9 @@ Each bug below was found by the stress or hidden-style suites, fixed, and re-ver
 - Natively, a design takes about 0.2 s on average and about 1 s for the most
   complex sample, plus a one-time model load of a few seconds. Under amd64
   emulation on Apple silicon (Colima/qemu), the 48 platform-format tasks took
-  about 7 s each.
+  about 15 s each. Each resize has a fixed work budget, so a very busy design
+  (about 100 elements, or a dozen loose labels into a thin banner) still finishes
+  in about 2 s natively.
 
 ## Files
 
