@@ -33,7 +33,7 @@ def reflow(source: dict, target: dict, roles: Optional[Dict[str, str]] = None) -
     best = max(cands, key=lambda l: l.score)
     out = emit(source, an, ctx, best)
     info = {"layout": best.name, "score": round(best.score, 4), "detail": best.detail,
-            "demoted": [b.bid for b in best.dropped], "missing_assets": sorted(e["id"] for e in an.missing),
+            "demoted": [b.bid for b in best.dropped],
             "candidates": len(cands)}
     return out, info
 
@@ -49,7 +49,6 @@ def emit(source: dict, an, ctx: Ctx, best) -> dict:
     content = [(r, 3.0 if p.sized.block.texts() else 1.0) for p in best.placed for r in p.rects()]
     bg_ids = {e["id"] for e in an.background}
     decor_ids = {e["id"] for e in an.decor}
-    missing_ids = {e["id"] for e in an.missing}
 
     out_els = []
     for el in source["elements"]:
@@ -59,13 +58,10 @@ def emit(source: dict, an, ctx: Ctx, best) -> dict:
             e.update(geo[eid])
         elif eid in bg_ids:
             _place_background(e, W, H)
-        elif eid not in missing_ids:
+        else:
             _place_decor(e, ctx, content)
         out_els.append(e)
     out = {"canvas": {"width": W, "height": H}, "elements": out_els}
-    for e in out_els:
-        if e.get("id") in missing_ids:
-            _place_missing(e, out_els, ctx, content)
     _finalize(out, W, H)
     return out
 
@@ -120,74 +116,6 @@ def _fit_box(e: dict, w: float, h: float, W: float, H: float) -> Tuple[float, fl
     k = min(1.0, W / w if w > 0 else 1.0, H / h if h > 0 else 1.0)
     return w * k, h * k
 
-
-def _place_missing(e: dict, out_els: List[dict], ctx: Ctx, content) -> None:
-    """An image whose asset file is missing renders as a grey placeholder.
-    We can't drop or hide it (ids and properties must be preserved), so keep
-    it in proportion but small, and tuck it behind an opaque element that
-    paints over it when one is big enough; otherwise into the quietest corner."""
-    w0, h0 = float(e.get("width", 0)), float(e.get("height", 0))
-    if w0 <= 0 or h0 <= 0:
-        e.update(x=0.0, y=0.0, width=0.0, height=0.0)
-        return
-    z = e.get("z_index", 0)
-    covers = []
-    for o in out_els:
-        if o is e or o.get("z_index", 0) <= z or o.get("rotation"):
-            continue
-        if o.get("type") == "shape" and float(o.get("opacity", 1)) >= 0.99 and "rgba" in str(o.get("fill_color")) \
-                and str(o.get("fill_color")).replace(" ", "").endswith(",1)"):
-            covers.append(o)
-    best = None
-    for o in covers:
-        ow, oh = float(o["width"]), float(o["height"])
-        inset = 0.2 * min(ow, oh)  # stay clear of rounded corners
-        k = min((ow - 2 * inset) / w0, (oh - 2 * inset) / h0)
-        if k <= 0:
-            continue
-        if best is None or k > best[0]:
-            best = (k, o)
-    if best is not None:
-        k, o = best
-        w, h = w0 * k, h0 * k
-        e.update(x=float(o["x"]) + (float(o["width"]) - w) / 2, y=float(o["y"]) + (float(o["height"]) - h) / 2,
-                 width=w, height=h)
-        return
-    k = max(4.0, 0.05 * min(ctx.W, ctx.H)) / h0
-    e.update(width=w0 * k, height=h0 * k, x=float(e.get("x", 0)), y=float(e.get("y", 0)))
-    _place_decor_fixed(e, ctx, content)
-
-
-def hide_missing(out: dict) -> None:
-    """Tuck missing-asset placeholders of any finished layout behind an opaque
-    element (or into the quietest corner), as reflow does for its own."""
-    from types import SimpleNamespace
-    from .measure import asset_exists
-
-    W, H = int(out["canvas"]["width"]), int(out["canvas"]["height"])
-    els = out["elements"]
-    missing = [e for e in els if e.get("type") == "image" and not asset_exists(e.get("asset_id"))]
-    if not missing:
-        return
-    content = [(el_rect(o), 3.0 if o.get("type") == "text" else 1.0) for o in els
-               if o not in missing and not (o.get("width", 0) >= 0.9 * W and o.get("height", 0) >= 0.9 * H)]
-    ctx = SimpleNamespace(W=float(W), H=float(H))
-    for e in missing:
-        _place_missing(e, els, ctx, content)
-        _clamp(e, W, H)
-
-
-def _place_decor_fixed(e: dict, ctx: Ctx, content) -> None:
-    w, h = float(e["width"]), float(e["height"])
-    best = None
-    for fx in (0.0, 1.0, 0.5):
-        for fy in (1.0, 0.0, 0.5):
-            px, py = (ctx.W - w) * fx, (ctx.H - h) * fy
-            r = (px, py, px + w, py + h)
-            c = sum(inter(r, cr) for cr, _ in content)
-            if best is None or c < best[0]:
-                best = (c, px, py)
-    e["x"], e["y"] = best[1], best[2]
 
 
 def _finalize(out: dict, W: int, H: int) -> None:

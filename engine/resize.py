@@ -11,7 +11,7 @@ from engine.geometry import area, background, bounds, contain, decorative, inter
 from engine.local_model import advise
 from engine.typography import fit_font, fits, metric_backend
 from engine.appearance import background_map, text_penalty
-from engine.reflow import hide_missing, reflow
+from engine.reflow import reflow
 from evaluation.audit import audit
 
 
@@ -225,11 +225,6 @@ def resize_with_diagnostics(source: dict[str, Any], target_canvas: dict[str, Any
         if mine["valid"] and (not theirs["valid"] or (
                 mine["text_overflows"] <= theirs["text_overflows"] and (clean or cost(mine) <= cost(theirs)))):
             chosen, engine = reflow_out, "reflow"
-    if engine != "reflow":
-        tucked = deepcopy(chosen)
-        hide_missing(tucked)
-        if audit(source, tucked, target)["valid"]:
-            chosen = tucked
     diagnostics.update(engine=engine, reflow=reflow_info)
     diagnostics["warnings"] = (["Some copy cannot remain comfortably readable at this target size."]
                                if any(e["type"] == "text" and e["font_size"] < 10 for e in chosen["elements"]) else [])

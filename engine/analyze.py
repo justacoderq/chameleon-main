@@ -6,7 +6,6 @@ from geometry, type and styling alone:
 
   background  - a full-bleed image/shape at the bottom of the stack
   decor       - translucent / oversized / off-canvas ungrouped shapes
-  missing     - image whose asset file isn't in the brand kit
   blocks      - the units that get laid out; each is one of
                   image  - a single picture (logo, product, ...)
                   text   - a single free-standing text box (reflowable)
@@ -27,7 +26,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
-from .measure import asset_exists, asset_visible_fraction, get_measurer
+from .measure import asset_visible_fraction, get_measurer
 
 Rect = Tuple[float, float, float, float]
 
@@ -147,9 +146,9 @@ def analyze(source: dict, roles: Optional[Dict[str, str]] = None) -> Analysis:
     rest = []
     for el in els:
         t = el.get("type")
-        if t == "image" and not asset_exists(el.get("asset_id")):
-            missing.append(el)
-        elif _is_full_bleed(el, W0, H0):
+        # An asset absent from the local brand kit is NOT treated as missing:
+        # scoring renders with the full asset set, so it's laid out like any image.
+        if _is_full_bleed(el, W0, H0):
             background.append(el)
         else:
             rest.append(el)
