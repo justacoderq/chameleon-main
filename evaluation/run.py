@@ -33,18 +33,22 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--split", choices=["samples","dev","holdout"], default="samples")
     p.add_argument("--count", type=int, default=12, help="Synthetic source count; each uses six targets")
+    p.add_argument("--seed-start", type=int, help="First synthetic seed for reproducible paired comparisons")
     p.add_argument("--renderer", choices=["official","pillow","none"], default="official")
     p.add_argument("--model", choices=["off","auto","required"], default="auto")
     p.add_argument("--output", type=Path, default=ROOT / "output/evaluation")
     args = p.parse_args()
+    if args.split == "samples" and args.seed_start is not None:
+        p.error("--seed-start can only be used with dev or holdout splits")
     os.environ["CHAMELEON_MODEL_MODE"] = args.model
     args.output.mkdir(parents=True, exist_ok=True)
     if args.split == "samples":
         cases = [(path.stem,json.loads(path.read_text(encoding="utf-8"))) for path in sorted((ROOT/"input").glob("*.json"))]
+        seed_start = None
     else:
-        start = 1000 if args.split == "holdout" else 100
+        seed_start = args.seed_start if args.seed_start is not None else (1000 if args.split == "holdout" else 100)
         cases = [(f"{args.split}-{seed}-{w}x{h}", {"source":synthetic(seed),"target_canvas":{"width":w,"height":h}})
-                 for seed in range(start,start+args.count) for w,h in TARGETS]
+                 for seed in range(seed_start,seed_start+args.count) for w,h in TARGETS]
     records, cards = [], []
     for name, task in cases:
         t0 = time.perf_counter()
@@ -65,6 +69,8 @@ def main():
             cards.append(f'<article><h2>{html.escape(name)}</h2><div class="row">{images}</div><pre>{html.escape(json.dumps(result,indent=2))}</pre></article>')
         print(f"{name}: valid={result['valid']}, overflow={result.get('text_overflows')}, small={result.get('small_texts')}, {seconds:.3f}s")
     summary = {"split":args.split,"case_count":len(records),"renderer":args.renderer,"model_mode":args.model,
+               "seed_start":seed_start,
+               "seed_count":args.count if args.split != "samples" else None,
                "valid_cases":sum(r["audit"]["valid"] for r in records),
                "baseline_valid_cases":sum(r["baseline"]["valid"] for r in records),
                "text_overflows":sum(r["audit"].get("text_overflows",0) for r in records),

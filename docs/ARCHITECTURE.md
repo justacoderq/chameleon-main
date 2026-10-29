@@ -16,8 +16,9 @@ or regenerating the artwork would solve the wrong input problem and could violat
    layouts at several allocation weights. Groups retain their internal geometry;
    single text boxes can reflow; images keep proportions.
 5. Fit text by measured local glyph widths and binary search, retaining explicit newlines,
-   max_lines and immutable content. Skia metrics are preferred when installed. Pillow
-   metrics approximate development behavior and need official-renderer cross-checking.
+   max_lines and immutable content. Skia metrics are preferred when installed. The
+   pinned official renderer is now exercised on the supplied samples; proxy quality
+   checks still do not reproduce the organizer's AI evaluation.
 6. Rank font readability, foreground collisions, image size, coarse source anchors,
    and approximate contrast/background variation sampled from the actual assets.
 7. Independently audit the winning JSON. Render and report quality limitations separately.
@@ -60,8 +61,8 @@ paper's results. No claim of beating learned methods or Adobe's official scorer 
 - Background samples estimate contrast and busyness; they are not full perceptual QA.
 - Intentional overlap outside explicit/simple inferred groups is ambiguous. Conservative
   collision avoidance may lose a source composition's character.
-- Typography measures glyph advances, but official style-run behavior, shaping, fallback
-  fonts and actual pixel bounds need renderer parity tests once cr-renderer is installed.
+- Typography measures glyph advances; official sample rendering now works, but
+  systematic pixel-level contrast, clipping and text-visibility checks remain needed.
 - No method can guarantee readable long paragraphs at every extreme canvas while
   preserving all content. The baseline flags small copy instead of dropping it.
 - Candidate evaluation is approximately quadratic in foreground unit count, and text

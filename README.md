@@ -14,11 +14,11 @@ The real model runs on the inspected Ryzen 5 5625U Windows laptop with approxima
 14 GiB usable RAM. The baseline has passed offline model integration and contract
 tests. See docs/RESULTS.md for measured results and limitations.
 
-**Not submission-verified yet:** the official cr-renderer dependency could not be
-installed through this session's blocked network; Docker is not installed, and no
-browser was connected for live Express testing. Current PNGs use an explicitly
-labeled Pillow development renderer. Extreme banners still contain unreadably small
-text. Model approval must be checked against the organizer's final list.
+The official cr-renderer is now pinned and installed for verification. The supplied
+samples render through it, but that is not the organizer's AI score. Docker is not
+installed, and the Adobe Express host flow could not be verified in a browser here.
+Extreme banners still contain unreadably small text. Model approval must be checked
+against the organizer's final list.
 
 ## Run on this workspace now (PowerShell)
 
@@ -60,8 +60,10 @@ the Pillow gallery as official renderer/scorer evidence.
 Open output/model-samples/index.html for original/stretch/result comparisons.
 Reports separate hard contract failures, overflow, small text, potential collisions,
 model status, and latency. They are local quality proxies, **not Adobe scores**.
-Run with --model off for an ablation. The synthetic holdout uses separate seeds but
-the same generator; add genuinely new designs before trusting generalization.
+Run with --model off for an ablation. For a paired comparison on a reproducible,
+separate synthetic seed range, use `--split holdout --seed-start 2000 --count 8`
+for both model modes. The synthetic holdout shares a generator with development
+cases; add genuinely new designs before trusting generalization.
 
 ## Offline container validation (requires Docker)
 
@@ -71,8 +73,8 @@ the same generator; add genuinely new designs before trusting generalization.
 Build downloads pinned public model weights and required packages. Runtime requires
 the model and official renderer; missing dependencies produce errors. Confirm the
 final organizer architecture/hardware requirements before freezing a submission.
-The upstream cr-renderer Git dependency is not commit-pinned yet; capture a verified
-revision and dependency lock after the first successful official build.
+The cr-renderer Git dependency is pinned to the revision verified in this workspace.
+Docker build and offline execution still need verification on a machine with Docker.
 
 ## Files
 
