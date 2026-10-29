@@ -60,6 +60,7 @@ class Ctx:
             self.mx = max(6.0, 0.06 * self.W)
         self.gmin = max(3.0, 0.014 * short)
         self.measurer = get_measurer()
+        self.sized_cache: Dict[tuple, "Sized"] = {}
 
     def minf_for(self, el: dict) -> float:
         floor = self.minf_floor if el.get("id") in self.demoted else self.minf
@@ -159,6 +160,9 @@ def size_image(b: Block, s: float, max_w: float, max_h: float, k: float = 1.0,
     if b.is_logo and ctx is not None:
         # a logo must stay recognisable: visible height ≥ ~3.5× min font
         sc = max(sc, 3.5 * ctx.minf / (h0 * fh))
+    elif ctx is not None:
+        # never let an image shrink into an invisible speck to make text fit
+        sc = max(sc, 2.5 * ctx.minf / max(h0 * fh, w0 * fw))
     if ctx is not None and not ctx.visible_fp:
         fw, fh = 1.0, 1.0
     sc = min(sc, max_w / (w0 * fw), max_h / (h0 * fh))
@@ -265,6 +269,17 @@ def size_row(b: Block, s: float, max_w: float, max_h: float, ctx: Ctx, widen) ->
 
 def size_block(b: Block, s: float, max_w: float, max_h: float, ctx: Ctx,
                widen: Optional[float] = None, img_k: float = 1.0) -> Sized:
+    # The layout search sizes the same block with the same inputs many times;
+    # Sized results are never mutated, so they can be shared.
+    key = (id(b), s, max_w, max_h, widen, img_k, ctx.visible_fp, ctx.minf_floor, frozenset(ctx.demoted))
+    z = ctx.sized_cache.get(key)
+    if z is None:
+        z = ctx.sized_cache[key] = _size_block(b, s, max_w, max_h, ctx, widen, img_k)
+    return z
+
+
+def _size_block(b: Block, s: float, max_w: float, max_h: float, ctx: Ctx,
+                widen: Optional[float], img_k: float) -> Sized:
     if b.kind == "text":
         return size_text(b, s, max_w, ctx, widen)
     if b.kind == "image":

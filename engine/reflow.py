@@ -31,7 +31,16 @@ def reflow(source: dict, target: dict, roles: Optional[Dict[str, str]] = None) -
     if not cands:
         raise RuntimeError("no reflow candidate fits")
     best = max(cands, key=lambda l: l.score)
+    out = emit(source, an, ctx, best)
+    info = {"layout": best.name, "score": round(best.score, 4), "detail": best.detail,
+            "demoted": [b.bid for b in best.dropped], "missing_assets": sorted(e["id"] for e in an.missing),
+            "candidates": len(cands)}
+    return out, info
 
+
+def emit(source: dict, an, ctx: Ctx, best) -> dict:
+    """Write one candidate layout back onto copies of the source elements."""
+    W, H = int(ctx.W), int(ctx.H)
     geo: Dict[str, dict] = {}
     for p in best.placed:
         for i, g in p.sized.geo.items():
@@ -58,11 +67,7 @@ def reflow(source: dict, target: dict, roles: Optional[Dict[str, str]] = None) -
         if e.get("id") in missing_ids:
             _place_missing(e, out_els, ctx, content)
     _finalize(out, W, H)
-
-    info = {"layout": best.name, "score": round(best.score, 4), "detail": best.detail,
-            "demoted": [b.bid for b in best.dropped], "missing_assets": sorted(missing_ids),
-            "candidates": len(cands)}
-    return out, info
+    return out
 
 
 # --------------------------------------------------------------------------
@@ -232,12 +237,33 @@ def _reconcile_text(e: dict, W: int, H: int, measure) -> None:
             e["x"] -= grow / 2 if align == "center" else (grow if align == "right" else 0.0)
             e["width"] += grow
             continue
+        if over_h and not over_w and _widen_to_unwrap(e, W, measure):
+            continue
         if over_h and m["height"] + 0.5 <= H and not over_w:
             e["height"] = m["height"] + 0.5
             continue
         if e["font_size"] <= 1:
             return
         e["font_size"] -= 1
+
+
+def _widen_to_unwrap(e: dict, W: int, measure) -> bool:
+    """Text sized tightly to its lines can wrap one word early when the
+    measuring backend differs slightly (e.g. another skia build). A few percent
+    of extra width is far less disruptive than an extra line of height."""
+    w0 = e["width"]
+    for k in (1.01, 1.02, 1.04, 1.06, 1.08):
+        w = min(w0 * k, float(W))
+        if w <= w0:
+            break
+        m = measure({**e, "width": w})
+        if m["height"] <= e["height"] + 0.05 and m["width"] <= w + 0.05:
+            align = e.get("text_align", "left")
+            grow = w - w0
+            e["x"] -= grow / 2 if align == "center" else (grow if align == "right" else 0.0)
+            e["width"] = w
+            return True
+    return False
 
 
 def _fit_rotated_text(e: dict, W: int, H: int, measure) -> None:
