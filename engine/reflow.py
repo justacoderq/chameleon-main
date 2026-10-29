@@ -60,6 +60,13 @@ def emit(source: dict, an, ctx: Ctx, best) -> dict:
             _place_background(e, W, H)
         else:
             _place_decor(e, ctx, content)
+        if e.get("type") == "shape":
+            # thin dividers must stay drawable: keep at least 1px where the source had it
+            for k in ("width", "height"):
+                if float(el.get(k, 0)) >= 1.0 and float(e.get(k, 0)) < 1.0:
+                    c = float(e["x" if k == "width" else "y"]) + float(e[k]) / 2
+                    e[k] = 1.0
+                    e["x" if k == "width" else "y"] = c - 0.5
         out_els.append(e)
     out = {"canvas": {"width": W, "height": H}, "elements": out_els}
     _finalize(out, W, H)
