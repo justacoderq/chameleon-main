@@ -33,7 +33,8 @@ def main() -> None:
                 d, label = src, f"#{seed} {arch} source {fmt}"
             else:
                 d, diag = resize_with_diagnostics(src, dict(zip(("width", "height"), FMT[t])))
-                label = f"{t} · {(diag.get('reflow') or {}).get('layout') or diag['engine']}"[:44]
+                shipped = (diag.get("reflow") or {}).get("layout") if diag["engine"] == "reflow" else "partition search"
+                label = f"{t} · {shipped}"[:44]
             tmp = kit.parent / "tile.png"
             render_design_to_png(d, str(kit / "assets"), str(tmp))
             tiles.append((Image.open(tmp).convert("RGB"), label))

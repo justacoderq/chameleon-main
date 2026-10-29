@@ -149,7 +149,7 @@ def _reconcile_text(e: dict, W: int, H: int, measure) -> None:
     measurement of the text fits inside it."""
     rigid = bool(e.get("group_id"))  # grouped labels keep their box; only the font gives
     if float(e.get("letter_spacing") or 0) > 0 and not rigid:
-        return _reconcile_spaced(e, H, measure)
+        return _reconcile_spaced(e, W, H, measure)
     for _ in range(60):
         m = measure(e)
         over_w = m["width"] > e["width"] + 0.05
@@ -177,10 +177,29 @@ def _reconcile_text(e: dict, W: int, H: int, measure) -> None:
         e["font_size"] -= 1
 
 
-def _reconcile_spaced(e: dict, H: int, measure) -> None:
+def _reconcile_spaced(e: dict, W: int, H: int, measure) -> None:
     """Letter-spaced text: the box width is the renderer's wrap width, chosen by
     the layout, so leave it alone (widening would re-wrap the lines); only make
     sure the box is tall enough for the text."""
+    from .measure import get_measurer
+
+    M = get_measurer()
+    for _ in range(40):
+        m = measure(e)
+        if m["width"] <= e["width"] + 0.05:
+            break
+        # the audit counts spacing while wrapping, so it wants a wider box; allow
+        # that only if the renderer would still break the lines identically
+        w = m["width"] + 0.5
+        if w <= W and M.layout(e, e["font_size"], w).lines == M.layout(e, e["font_size"], e["width"]).lines:
+            align = e.get("text_align", "left")
+            grow = w - e["width"]
+            e["x"] -= grow / 2 if align == "center" else (grow if align == "right" else 0.0)
+            e["width"] = w
+            break
+        if e["font_size"] <= 1:
+            break
+        e["font_size"] -= 1
     m = measure(e)
     if m["height"] > e["height"] + 0.05:
         e["height"] = min(float(H), m["height"] + 0.5)
