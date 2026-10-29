@@ -1,5 +1,23 @@
 # Baseline results and limits
 
+## Update: combined engine (2026-10-29)
+
+The sections below record the original baseline on its Windows machine. Since then,
+the structure-aware reflow engine has been combined with this partition search (see
+the README). Measured on macOS with the same pinned cr-renderer:
+
+- Docker: builds and runs with `--network none` using the exact FAQ command (Colima,
+  linux/amd64 emulation). The 3 samples and the samples at 15 real platform formats
+  were all valid, 51/51, with the model used every time, at about 7 s per design under emulation.
+- Level 3 at 728×90: the headline is now readable; badges, CTA label and legal copy
+  are demoted to fine print, and the missing-asset placeholder is hidden behind the CTA.
+- Stress: 10,573 cases (samples, mutations, 200 synthetic designs × 35 targets),
+  with 0 crashes, 0 invalid outputs, and identical outputs on every rerun.
+- Express panel: verified end to end in Chrome against the combined engine
+  (sample → 728×90 → rendered result, no console errors). Adobe-host insertion
+  is still unverified.
+
+
 ## Environment
 
 Windows 11, AMD Ryzen 5 5625U, 12 logical CPU threads, 13.86 GiB usable RAM.
@@ -139,11 +157,12 @@ It is logged as an intermediate result, not a final model comparison.
 
 1. The organizer's AI scorer and numeric/weighted rubric are not supplied, so no official
    score or “best method” claim can be made from these proxies.
-2. Docker build and `--network none` execution: Docker is not installed on this machine.
+2. Docker build and `--network none` execution: verified later on macOS (see the update above).
 3. Full Adobe Express host integration was not validated; the available headless browser
    lacked its Chromium executable. Local HTTP endpoints were verified separately.
 4. Approved-model list and final reference-hardware limits remain unspecified in the brief.
-5. Extreme banners: level 3 remains visibly too small despite valid geometry.
+5. Extreme banners: improved by the combined engine; supporting copy on 728×90 and smaller
+   is still fine print.
 6. Native Express editable-node import/export is not implemented; current import is one PNG.
 
 ## Reproducible evidence
